@@ -1,4 +1,4 @@
-# Secure FTP Server with Fail2Ban
+# Tool for automated deployment of Secure FTP Server with Fail2Ban
 
 ## Description
 This script automates the setup and management of a secure FTP server using vsftpd, combined with Fail2Ban to protect against brute-force attacks. It includes options for user management, configuration of FTP permissions, and real-time IP banning.
