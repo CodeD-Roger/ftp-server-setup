@@ -22,5 +22,4 @@ sudo ./ftp-server.sh
 
 ## Usage
 1. **Run the script:**
-   ```bash
    sudo ./ftp-server.txt
