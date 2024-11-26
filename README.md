@@ -1,4 +1,3 @@
-```
 # Secure FTP Server with Fail2Ban
 
 ## Description
@@ -21,6 +20,7 @@ cd ftp-server-setup
 chmod +x ftp-server.sh
 sudo ./ftp-server.sh
 ```
-## USAGE
+## Usage 
 ```bash
 sudo ./ftp-server.sh
+
