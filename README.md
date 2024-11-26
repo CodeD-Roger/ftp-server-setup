@@ -1,3 +1,4 @@
+```
 # Secure FTP Server with Fail2Ban
 
 ## Description
@@ -18,4 +19,8 @@ This script automates the setup and management of a secure FTP server using vsft
 git clone https://github.com/BuggyTheDebugger/ftp-server-setup.git
 cd ftp-server-setup
 chmod +x ftp-server.sh
+sudo ./ftp-server.sh
+```
+## USAGE
+```bash
 sudo ./ftp-server.sh
