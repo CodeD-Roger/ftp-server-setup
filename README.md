@@ -14,10 +14,11 @@ This script automates the setup and management of a secure FTP server using vsft
 - Root privileges for script execution.
 
 ## Installation 
-- git clone https://github.com/BuggyTheDebugger/ftp-server-setup.git
-- cd ftp-server-setup
-- chmod +x ftp-server.sh
-- sudo ./ftp-server.sh
+ ```bash
+  git clone https://github.com/BuggyTheDebugger/ftp-server-setup.git
+  cd ftp-server-setup
+  chmod +x ftp-server.sh
+  sudo ./ftp-server.sh
 
 ## Usage
 1. **Run the script:**
