@@ -19,6 +19,7 @@ This script automates the setup and management of a secure FTP server using vsft
   cd ftp-server-setup
   chmod +x ftp-server.sh
   sudo ./ftp-server.sh
+ ```bash
 
 ## Usage
 1. **Run the script:**
