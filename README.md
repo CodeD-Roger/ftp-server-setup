@@ -21,5 +21,5 @@ chmod +x ftp-server.sh
 sudo ./ftp-server.sh
 
 ## Usage
-1. **Run the script:**
-   sudo ./ftp-server.txt
+
+sudo ./ftp-server.sh
