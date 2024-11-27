@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Author: [BuggyTheDebugger]
+# Author: [CodeD-Roger]
 
 # ================================================
 # Secure FTP Server Management with vsftpd and Fail2Ban
