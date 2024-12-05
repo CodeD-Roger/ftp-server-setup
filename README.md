@@ -15,7 +15,7 @@ This script automates the setup and management of a secure FTP server using vsft
 
 ## Installation
 ```bash
-git clone https://github.com/BuggyTheDebugger/ftp-server-setup.git
+git clone https://github.com/CodeD-Roger/ftp-server-setup.git
 cd ftp-server-setup
 chmod +x ftp-server.sh
 sudo ./ftp-server.sh
