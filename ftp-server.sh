@@ -303,7 +303,7 @@ install_fail2ban() {
     backup_file "/etc/fail2ban/jail.local"
 
     cat <<EOL > /etc/fail2ban/jail.local
-    
+
 [DEFAULT]
 bantime = 10m
 findtime = 10m
@@ -331,6 +331,23 @@ bantime = 10m
 
     systemctl restart fail2ban
     log_action "Fail2Ban installé et configuré de manière renforcée"
+}
+
+check_fail2ban_status() {
+    echo "Checking Fail2Ban status..."
+    echo "1. Service status:"
+    systemctl status fail2ban | grep "Active:"
+    echo
+    echo "2. Jail status:"
+    fail2ban-client status vsftpd
+    echo
+    echo "3. Log file check:"
+    if [ -f /var/log/vsftpd.log ]; then
+        echo "vsftpd log exists"
+        tail -n 5 /var/log/vsftpd.log
+    else
+        echo "vsftpd log file not found!"
+    fi
 }
 
 modify_fail2ban_config() {
