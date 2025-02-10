@@ -2,6 +2,12 @@
 
 # Author: [CodeD-Roger]
 
+# Vérification et installation des outils système
+install_system_tools() {
+    apt update
+    apt install -y useradd passwd
+}
+
 # ================================================
 # Secure FTP Server Management with vsftpd and Fail2Ban
 # ================================================
@@ -20,6 +26,8 @@ log_action() {
     local message="$1"
     echo "$(date '+%Y-%m-%d %H:%M:%S') : $message" >> "$LOG_FILE"
 }
+
+
 
 backup_file() {
     local file="$1"
@@ -85,18 +93,25 @@ EOL
 }
 
 test_ftp_server() {
-    apt install -y lftp
-    echo "Testing FTP server connection..."
-    read -p "Enter an existing FTP user: " test_user
-    read -sp "Enter the user's password: " test_pass
+    if ! command -v lftp &>/dev/null; then
+        apt install -y lftp
+    fi
+
+    read -p "Nom d'utilisateur FTP : " test_user
+    read -sp "Mot de passe : " test_pass
     echo
-    lftp -u "$test_user,$test_pass" -e "set ssl:verify-certificate no; ls; bye" "ftp://$(hostname -I | awk '{print $1}')"
+
+    # Test de connexion sécurisé
+    lftp -u "$test_user,$test_pass" \
+        -e "set ssl:verify-certificate yes; ls; bye" \
+        "ftps://$(hostname -I | awk '{print $1}')"
+
     if [ $? -eq 0 ]; then
-        echo "Connection successful."
-        log_action "FTP connection test successful with user $test_user."
+        echo "Connexion réussie"
+        log_action "Test connexion FTP réussi pour $test_user"
     else
-        echo "Connection failed."
-        log_action "FTP connection test failed."
+        echo "Échec de connexion"
+        log_action "Échec test connexion FTP pour $test_user"
     fi
 }
 
@@ -122,20 +137,88 @@ ftp_menu() {
 # Users Section
 # ================================================
 
+configure_password_policy() {
+    read -p "Voulez-vous définir une politique de mot de passe personnalisée ? (o/n) [défaut: n]: " use_policy
+    use_policy=${use_policy:-n}
+
+    if [[ "$use_policy" != "o" ]]; then
+        # Supprimer le fichier de configuration si existe
+        rm -f /etc/ftp_password_policy.conf
+        echo "Politique de mot de passe par défaut."
+        log_action "Politique de mot de passe par défaut"
+        return
+    fi
+
+}
+
+generate_complex_password() {
+    local password
+    local policy_min_length=${MIN_LENGTH:-12}
+    local policy_require_digits=${REQUIRE_DIGITS:-1}
+    local policy_require_letters=${REQUIRE_LETTERS:-1}
+    local policy_exclude_chars="${EXCLUDE_CHARS:-}"
+
+    while true; do
+        password=$(openssl rand -base64 16)
+
+        if [ ${#password} -lt "$policy_min_length" ]; then
+            continue
+        fi
+
+        if [ "$policy_require_digits" -eq 1 ] && [[ ! "$password" =~ [0-9] ]]; then
+            continue
+        fi
+
+        if [ "$policy_require_letters" -eq 1 ] && [[ ! "$password" =~ [a-zA-Z] ]]; then
+            continue
+        fi
+
+        if [ -n "$policy_exclude_chars" ] && [[ "$password" =~ [$policy_exclude_chars] ]]; then
+            continue
+        fi
+
+        echo "$password"
+        break
+    done
+}
+
 add_ftp_user() {
-    read -p "Enter username: " username
-    password=$(openssl rand -base64 12)
+    # Installer les outils système si nécessaire
+    install_system_tools
 
-    useradd -m -s /bin/bash "$username"
-    echo "$username:$password" | chpasswd
+    # Vérification du nom d'utilisateur
+    read -p "Nom d'utilisateur : " username
+    if [[ ! "$username" =~ ^[a-z_][a-z0-9_-]{2,31}$ ]]; then
+        echo "Nom d'utilisateur invalide"
+        return 1
+    fi
 
+    # Vérifier si l'utilisateur existe déjà
+    if id "$username" &>/dev/null; then
+        echo "L'utilisateur $username existe déjà"
+        return 1
+    fi
+
+    # Génération du mot de passe
+    if [ -f /etc/ftp_password_policy.conf ]; then
+        source /etc/ftp_password_policy.conf
+        password=$(generate_complex_password)
+    else
+        password=$(openssl rand -base64 12)
+    fi
+
+    # Création de l'utilisateur
+    /usr/sbin/useradd -m -s /bin/bash "$username"
+    echo "$username:$password" | /usr/bin/passwd "$username"
+
+    # Création des répertoires FTP
     mkdir -p /home/"$username"/ftp/upload
-    chmod 555 /home/"$username"/ftp
+    chmod 755 /home/"$username"/ftp
     chmod 755 /home/"$username"/ftp/upload
     chown "$username:$username" /home/"$username"/ftp/upload
 
-    echo "User $username created with password: $password"
-    log_action "User $username created with FTP access."
+    echo "Utilisateur $username créé avec le mot de passe : $password"
+    log_action "Utilisateur $username créé avec accès FTP"
 }
 
 delete_ftp_user() {
@@ -191,19 +274,21 @@ users_menu() {
     while true; do
         echo "====== Users ======"
         echo "1. Add FTP user"
-        echo "2. Delete FTP user"
-        echo "3. Modify user permissions"
-        echo "4. List users"
-        echo "5. Return to main menu"
-        read -p "Choose an option [1-5]: " user_choice
+        echo "2. Configure password policy"  # Nouveau choix
+        echo "3. Delete FTP user"
+        echo "4. Modify user permissions"
+        echo "5. List users"
+        echo "6. Return to main menu"
+        read -p "Choose an option [1-6]: " user_choice
 
         case $user_choice in
             1) add_ftp_user ;;
-            2) delete_ftp_user ;;
-            3) modify_user_permissions ;;
-            4) list_ftp_users ;;
-            5) clear
-	       return ;;
+            2) configure_password_policy ;;  # Nouvelle option
+            3) delete_ftp_user ;;
+            4) modify_user_permissions ;;
+            5) list_ftp_users ;;
+            6) clear
+               return ;;
             *) echo "Invalid option." ;;
         esac
     done
@@ -214,26 +299,38 @@ users_menu() {
 # ================================================
 
 install_fail2ban() {
-    clear 
-    log_action "Installing Fail2Ban..."
     apt update && apt install -y fail2ban
     backup_file "/etc/fail2ban/jail.local"
 
     cat <<EOL > /etc/fail2ban/jail.local
+    
 [DEFAULT]
 bantime = 10m
 findtime = 10m
 maxretry = 4
+banaction = iptables-multiport
+backend = auto
 
 [vsftpd]
 enabled = true
-port = ftp,ftp-data,40000-50000
+port = ftp,ftp-data,40000:50000
 filter = vsftpd
 logpath = /var/log/vsftpd.log
-EOL
+maxretry = 4
+bantime = 10m
+findtime = 10m
+
+[vsftpd-iptables]
+enabled = true
+filter = vsftpd
+action = iptables[name=vsftpd, port="21,40000:50000", protocol=tcp]
+logpath = /var/log/vsftpd.log
+maxretry = 4
+findtime = 10m
+bantime = 10m
 
     systemctl restart fail2ban
-    log_action "Fail2Ban installed and configured."
+    log_action "Fail2Ban installé et configuré de manière renforcée"
 }
 
 modify_fail2ban_config() {
@@ -367,4 +464,3 @@ main_menu() {
 }
 
 main_menu
-
