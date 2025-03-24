@@ -632,82 +632,39 @@ delete_ftp_user() {
     local username="$1"
     local keep_home="$2"
     
+    # Function to modify user permissions
+modify_user_permissions() {
+    local username="$1"
+    local permission="$2"
+    
     # Check if user exists
     if ! id -u "$username" > /dev/null 2>&1; then
         log "User $username does not exist" "ERROR"
         return 1
     fi
     
-    # Get user's home directory before deleting
+    # Get user's home directory
     local home_dir=$(getent passwd "$username" | cut -d: -f6)
     
-    # Remove user from the authorized users list
-    if [[ -f "$VSFTPD_USER_LIST" ]]; then
-        sed -i "/^$username$/d" "$VSFTPD_USER_LIST"
-        log "Removed $username from authorized users list" "INFO"
-    fi
-    
-    # Delete the user
-    if [[ "$keep_home" == "yes" ]]; then
-        userdel "$username"
-        log "User $username deleted (home directory preserved)" "SUCCESS"
-    else
-        userdel -r "$username"
-        log "User $username deleted with home directory" "SUCCESS"
-    fi
-    
-    return 0
-}
-
-# Function to change user password
-change_user_password() {
-    local username="$1"
-    local password="$2"
-    local generate_pwd="$3"
-    
-    # Check if user exists
-    if ! id -u "$username" > /dev/null 2>&1; then
-        log "User $username does not exist" "ERROR"
-        return 1
-    fi
-    
-    # Generate a secure password if requested
-    if [[ "$generate_pwd" == "yes" ]]; then
-        password=$(generate_secure_password)
-        echo -e "${GREEN}Generated secure password for $username: ${CYAN}$password${RESET}"
-        echo -e "${YELLOW}Please save this password securely!${RESET}"
-    fi
-    
-    # Set the new password
-    if command -v chpasswd > /dev/null 2>&1; then
-        # Create a temporary file with the password
-        local temp_pwd_file=$(mktemp)
-        echo "$username:$password" > "$temp_pwd_file"
-        chpasswd < "$temp_pwd_file"
-        rm -f "$temp_pwd_file"
-    elif command -v passwd > /dev/null 2>&1; then
-        # Alternative method for setting password
-        local temp_pwd_file=$(mktemp)
-        echo "$password" > "$temp_pwd_file"
-        echo "$password" >> "$temp_pwd_file"
-        passwd "$username" < "$temp_pwd_file" > /dev/null 2>&1
-        rm -f "$temp_pwd_file"
-    else
-        log "No password change command found" "ERROR"
-        return 1
-    fi
-    
-    log "Password for user $username successfully changed" "SUCCESS"
-    
-    # Display updated connection information for FileZilla
-    echo -e "\n${CYAN}=== Updated FileZilla Connection Information ===${RESET}"
-    echo -e "${GREEN}Host:${RESET} $(/sbin/ip -o -4 addr list | grep -v "127.0.0.1" | awk '{print $4}' | cut -d/ -f1 | head -n1)"
-    echo -e "${GREEN}Port:${RESET} $FTP_PORT"
-    echo -e "${GREEN}Protocol:${RESET} FTP - File Transfer Protocol"
-    echo -e "${GREEN}Encryption:${RESET} Require explicit FTP over TLS"
-    echo -e "${GREEN}Logon Type:${RESET} Normal"
-    echo -e "${GREEN}User:${RESET} $username"
-    echo -e "${GREEN}Password:${RESET} $password"
+    case "$permission" in
+        "read-only")
+            # Remove write permissions for the user
+            chmod u-w "$home_dir"
+            log "Set read-only permissions for user $username" "SUCCESS"
+            echo -e "${GREEN}User $username now has read-only access${RESET}"
+            ;;
+        "read-write")
+            # Add write permissions for the user
+            chmod u+w "$home_dir"
+            log "Set read-write permissions for user $username" "SUCCESS"
+            echo -e "${GREEN}User $username now has read-write access${RESET}"
+            ;;
+        *)
+            log "Invalid permission type: $permission" "ERROR"
+            echo -e "${RED}Invalid permission type. Use 'read-only' or 'read-write'${RESET}"
+            return 1
+            ;;
+    esac
     
     return 0
 }
@@ -838,6 +795,21 @@ change_user_path() {
     return 0
 }
 
+    log "Password for user $username successfully changed" "SUCCESS"
+    
+    # Display updated connection information for FileZilla
+    echo -e "\n${CYAN}=== Updated FileZilla Connection Information ===${RESET}"
+    echo -e "${GREEN}Host:${RESET} $(/sbin/ip -o -4 addr list | grep -v "127.0.0.1" | awk '{print $4}' | cut -d/ -f1 | head -n1)"
+    echo -e "${GREEN}Port:${RESET} $FTP_PORT"
+    echo -e "${GREEN}Protocol:${RESET} FTP - File Transfer Protocol"
+    echo -e "${GREEN}Encryption:${RESET} Require explicit FTP over TLS"
+    echo -e "${GREEN}Logon Type:${RESET} Normal"
+    echo -e "${GREEN}User:${RESET} $username"
+    echo -e "${GREEN}Password:${RESET} $password"
+    
+    return 0
+}
+
 # Function to test vsftpd configuration
 test_vsftpd_config() {
     log "Testing vsftpd configuration..." "INFO"
@@ -860,7 +832,7 @@ test_vsftpd_config() {
     
     # Check for SSL certificate
     if grep -q "ssl_enable=YES" "$VSFTPD_CONF"; then
-        local cert_file=$(grep "rsa_cert_file=" "$VSFTPD_CONF" | cut -d= -f2)
+local cert_file=$(grep "rsa_cert_file=" "$VSFTPD_CONF" | cut -d= -f2)        local cert_file=$(grep "rsa_cert_file=" "$VSFTPD_CONF" | cut -d= -f2)
         if [ ! -f "$cert_file" ]; then
             echo -e "${RED}Error: SSL certificate file $cert_file not found${RESET}"
             log "SSL certificate file $cert_file not found" "ERROR"
